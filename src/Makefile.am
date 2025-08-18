@@ -487,6 +487,7 @@ libbitcoin_common_a_SOURCES = \
   bloom.cpp \
   chainparams.cpp \
   coins.cpp \
+  addressbalances.cpp \
   compressor.cpp \
   core_read.cpp \
   core_write.cpp \
@@ -645,7 +646,7 @@ bitcoin_tx_LDADD = \
   $(LIBBITCOIN_CRYPTO) \
   $(LIBSECP256K1)
 
-bitcoin_tx_LDADD += $(BOOST_LIBS)
+bitcoin_tx_LDADD += $(BOOST_LIBS) $(BDB_LIBS)
 #
 
 # bitcoin-wallet binary #

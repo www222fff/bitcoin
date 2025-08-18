@@ -9,6 +9,10 @@
 #include <random.h>
 #include <version.h>
 
+#include <script/standard.h>
+#include <key_io.h>
+#include "addressbalances.h"
+
 bool CCoinsView::GetCoin(const COutPoint &outpoint, Coin &coin) const { return false; }
 uint256 CCoinsView::GetBestBlock() const { return uint256(); }
 std::vector<uint256> CCoinsView::GetHeadBlocks() const { return std::vector<uint256>(); }
@@ -107,6 +111,13 @@ void AddCoins(CCoinsViewCache& cache, const CTransaction &tx, int nHeight, bool 
         // Coinbase transactions can always be overwritten, in order to correctly
         // deal with the pre-BIP30 occurrences of duplicate coinbase transactions.
         cache.AddCoin(COutPoint(txid, i), Coin(tx.vout[i], nHeight, fCoinbase), overwrite);
+
+        CTxDestination dest;
+	if (ExtractDestination(tx.vout[i].scriptPubKey, dest)) {
+		std::string addr = EncodeDestination(dest);
+		g_addr_db.WriteBalance(addr, tx.vout[i].nValue, true);
+        }
+
     }
 }
 
@@ -123,6 +134,15 @@ bool CCoinsViewCache::SpendCoin(const COutPoint &outpoint, Coin* moveout) {
         it->second.flags |= CCoinsCacheEntry::DIRTY;
         it->second.coin.Clear();
     }
+
+    if (moveout && !moveout->IsSpent()) {
+        CTxDestination dest;
+        if (ExtractDestination(moveout->out.scriptPubKey, dest)) {
+            std::string addr = EncodeDestination(dest);
+            g_addr_db.WriteBalance(addr, moveout->out.nValue, false);
+        }
+    }
+
     return true;
 }
 

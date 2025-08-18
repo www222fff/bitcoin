@@ -4,6 +4,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <rpc/blockchain.h>
+#include <addressbalances.h>
 
 #include <amount.h>
 #include <blockfilter.h>
@@ -54,6 +55,13 @@ struct CUpdatedBlock
 static Mutex cs_blockchange;
 static std::condition_variable cond_blockchange;
 static CUpdatedBlock latestblock GUARDED_BY(cs_blockchange);
+
+struct UTXO {
+    std::string address;
+    int64_t value;
+    int blockHeight;
+};
+extern std::vector<UTXO> g_utxoList;
 
 NodeContext& EnsureNodeContext(const util::Ref& context)
 {
@@ -187,6 +195,117 @@ UniValue blockToJSON(const CBlock& block, const CBlockIndex* tip, const CBlockIn
     if (pnext)
         result.pushKV("nextblockhash", pnext->GetBlockHash().GetHex());
     return result;
+}
+
+//danny
+static RPCHelpMan gettotalbalances()
+{
+    return RPCHelpMan{
+        "gettotalbalances",
+        "\nReturns paginated address balances.\n",
+        {},
+        RPCResult{
+            RPCResult::Type::STR, "", "total balances",
+        },
+        RPCExamples{
+            HelpExampleCli("gettotalbalances", "")
+            + HelpExampleRpc("gettotalbalances", "")
+        },
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+        LOCK(cs_main);
+        return g_addr_db.GetTotalBalances();
+},
+    };
+}
+
+static RPCHelpMan getlatestutxo()
+{
+    return RPCHelpMan{
+        "getlatestutxo",
+        "\nReturns latest utxo in recent blocks.\n",
+        {},
+        RPCResult{
+            RPCResult::Type::ARR, "", "List of latest utxo",
+            {
+                {RPCResult::Type::OBJ, "", "",
+                    {
+                        {RPCResult::Type::STR, "address", "The Bitcoin address"},
+                        {RPCResult::Type::NUM, "utxo", "utxo in latest blocks"},
+                    }
+                }
+            }
+        },
+        RPCExamples{
+            HelpExampleCli("getlatestutxo", "")
+            + HelpExampleRpc("getlatestutxo", "")
+        },
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+            UniValue result(UniValue::VARR);
+            for (const auto& utxo : g_utxoList) {
+                UniValue obj(UniValue::VOBJ);
+                obj.pushKV("address", utxo.address.c_str());
+                obj.pushKV("utxo", utxo.value);
+                result.push_back(obj);
+            }
+
+},
+    };
+}
+
+static RPCHelpMan getaddressbalances()
+{
+    return RPCHelpMan{
+        "getaddressbalances",
+        "\nReturns paginated address balances.\n",
+        {
+            {"offset", RPCArg::Type::NUM, RPCArg::Optional::NO, "Starting index (default 0)"},
+        },
+        RPCResult{
+            RPCResult::Type::ARR, "", "List of address balances",
+            {
+                {RPCResult::Type::OBJ, "", "",
+                    {
+                        {RPCResult::Type::STR, "address", "The Bitcoin address"},
+                        {RPCResult::Type::NUM, "balance", "Balance in satoshis"},
+                    }
+                }
+            }
+        },
+        RPCExamples{
+            HelpExampleCli("getaddressbalances", "0")
+            + HelpExampleRpc("getaddressbalances", "0")
+        },
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+        {
+            LOCK(cs_main);
+
+	    int limit = 100;
+	    int offset = 0;
+	    if (request.params.size() > 0) {
+		    std::string s = request.params[0].get_str(); // 无论传进来是 "0" 还是 0，都能取到字符串
+		    try {
+			    offset = std::stoi(s);
+		    } catch (const std::exception&) {
+			    throw JSONRPCError(RPC_INVALID_PARAMETER, "Offset must be an integer string");
+		    }
+            }
+
+            LogPrintf("Number of params: %d %d\n", offset, limit);
+            auto balances = g_addr_db.GetBalances(offset, limit);
+
+            UniValue result(UniValue::VARR);
+            for (const auto& [addr, bal] : balances) {
+                UniValue obj(UniValue::VOBJ);
+                obj.pushKV("address", addr);
+                obj.pushKV("balance", bal);
+                result.push_back(obj);
+            }
+
+            return result;
+        }
+    };
 }
 
 static RPCHelpMan getblockcount()
@@ -2472,8 +2591,11 @@ static const CRPCCommand commands[] =
     { "blockchain",         "getblockstats",          &getblockstats,          {"hash_or_height", "stats"} },
     { "blockchain",         "getbestblockhash",       &getbestblockhash,       {} },
     { "blockchain",         "getblockcount",          &getblockcount,          {} },
+    { "blockchain",         "gettotalbalances",       &gettotalbalances,       {} },
+    { "blockchain",         "getlatestutxo",          &getlatestutxo,          {} },
     { "blockchain",         "getblock",               &getblock,               {"blockhash","verbosity|verbose"} },
     { "blockchain",         "getblockhash",           &getblockhash,           {"height"} },
+    { "blockchain",         "getaddressbalances",     &getaddressbalances,     {"offset"} },
     { "blockchain",         "getblockheader",         &getblockheader,         {"blockhash","verbose"} },
     { "blockchain",         "getchaintips",           &getchaintips,           {} },
     { "blockchain",         "getdifficulty",          &getdifficulty,          {} },
