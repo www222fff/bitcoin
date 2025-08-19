@@ -6,6 +6,7 @@
 #include <validation.h>
 #include <script/standard.h>
 #include <key_io.h>
+#include <addressbalances.h>
 
 #include <arith_uint256.h>
 #include <chain.h>
@@ -1943,41 +1944,6 @@ static int64_t nTimeCallbacks = 0;
 static int64_t nTimeTotal = 0;
 static int64_t nBlocksTotal = 0;
 
-
-struct UTXO {
-    std::string address;
-    int64_t value; // satoshi
-    int blockHeight;
-};
-
-std::vector<UTXO> g_utxoList;
-int maxBlocks = 10;
-void AddBlockUTXOs(const CBlock& block, int blockHeight)
-{
-    // 1. 遍历交易输出
-    for (const auto& tx : block.vtx) {
-        for (const auto& txout : tx->vout) {
-            if (txout.nValue > 0) {
-                CTxDestination dest;
-                if (ExtractDestination(txout.scriptPubKey, dest)) {
-                    std::string addr = EncodeDestination(dest);
-                    g_utxoList.push_back({addr, txout.nValue, blockHeight});
-                }
-            }
-        }
-    }
-
-    // 2. 只保留最近 maxBlocks 个区块
-    g_utxoList.erase(
-        std::remove_if(g_utxoList.begin(), g_utxoList.end(),
-                       [blockHeight](const UTXO& u) { return u.blockHeight <= blockHeight - maxBlocks; }),
-        g_utxoList.end());
-
-    // 3. 按 value 降序排序
-    std::sort(g_utxoList.begin(), g_utxoList.end(),
-              [](const UTXO& a, const UTXO& b) { return a.value > b.value; });
-}
-
 /** Apply the effects of this block (with given index) on the UTXO set represented by coins.
  *  Validity checks that depend on the UTXO set are also done; ConnectBlock()
  *  can fail if those validity checks fail (among other reasons). */
@@ -2246,7 +2212,18 @@ bool CChainState::ConnectBlock(const CBlock& block, BlockValidationState& state,
     }
 
     //danny
-    //AddBlockUTXOs(block, pindex->nHeight);
+    g_utxo_db.Clear();
+    for (const auto& tx : block.vtx) {
+        for (const auto& txout : tx->vout) {
+            if (txout.nValue > 0) {
+                CTxDestination dest;
+                if (ExtractDestination(txout.scriptPubKey, dest)) {
+                    std::string addr = EncodeDestination(dest);
+                    g_utxo_db.WriteBalance(addr, txout.nValue, true);
+                }
+            }
+        }
+    }
 
     int64_t nTime3 = GetTimeMicros(); nTimeConnect += nTime3 - nTime2;
     LogPrint(BCLog::BENCH, "      - Connect %u transactions: %.2fms (%.3fms/tx, %.3fms/txin) [%.2fs (%.2fms/blk)]\n", (unsigned)block.vtx.size(), MILLI * (nTime3 - nTime2), MILLI * (nTime3 - nTime2) / block.vtx.size(), nInputs <= 1 ? 0 : MILLI * (nTime3 - nTime2) / (nInputs-1), nTimeConnect * MICRO, nTimeConnect * MILLI / nBlocksTotal);

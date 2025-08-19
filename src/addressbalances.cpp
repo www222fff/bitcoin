@@ -5,6 +5,7 @@
 #include <sstream>
 
 AddressBalanceDB g_addr_db("address_balances");
+AddressBalanceDB g_utxo_db("latest_utxo");
 
 AddressBalanceDB::AddressBalanceDB(const std::string& filename)
     : db(nullptr, 0), sec_db(nullptr, 0)
@@ -40,6 +41,18 @@ AddressBalanceDB::~AddressBalanceDB() {
         db.close(0);
     } catch (DbException& e) {
         std::cerr << "Error closing BDB: " << e.what() << std::endl;
+    }
+}
+
+bool AddressBalanceDB::Clear() {
+    try {
+        db.truncate(NULL, NULL, 0); // 清空主数据库，无需计数
+        sec_db.truncate(NULL, NULL, 0); // 清空辅助数据库，无需计数
+        std::cout << "Database cleared successfully." << std::endl;
+        return true;
+    } catch (DbException& e) {
+        std::cerr << "Clear error: " << e.what() << std::endl;
+        return false;
     }
 }
 
@@ -165,8 +178,7 @@ std::map<std::string, uint64_t> AddressBalanceDB::GetBalances(size_t offset, siz
             std::string balance_str = key_str.substr(0, 16);
             uint64_t balance = std::stoull(balance_str, nullptr, 16); 
 
-            size_t addr_len = key.get_size() - 16 - 1;  //"_"
-            std::string addr = key_str.substr(16 + 1, addr_len);
+            //Important Note: Must use sorted key_str as UniValue will resort, if keep addr then output will not be sorted by balance 
             result[key_str] = UINT64_MAX - balance;
         }
 

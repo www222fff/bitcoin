@@ -56,13 +56,6 @@ static Mutex cs_blockchange;
 static std::condition_variable cond_blockchange;
 static CUpdatedBlock latestblock GUARDED_BY(cs_blockchange);
 
-struct UTXO {
-    std::string address;
-    int64_t value;
-    int blockHeight;
-};
-extern std::vector<UTXO> g_utxoList;
-
 NodeContext& EnsureNodeContext(const util::Ref& context)
 {
     if (!context.Has<NodeContext>()) {
@@ -242,14 +235,18 @@ static RPCHelpMan getlatestutxo()
         },
         [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
 {
+            auto balances = g_utxo_db.GetBalances(0, 1000);
+
             UniValue result(UniValue::VARR);
-            for (const auto& utxo : g_utxoList) {
+            for (const auto& [addr, bal] : balances) {
                 UniValue obj(UniValue::VOBJ);
-                obj.pushKV("address", utxo.address.c_str());
-                obj.pushKV("utxo", utxo.value);
+                obj.pushKV("address", addr);
+                double btcValue = static_cast<double>(bal) / 100000000.0;
+                obj.pushKV("utxo", btcValue);
                 result.push_back(obj);
             }
 
+            return result;
 },
     };
 }
@@ -299,7 +296,8 @@ static RPCHelpMan getaddressbalances()
             for (const auto& [addr, bal] : balances) {
                 UniValue obj(UniValue::VOBJ);
                 obj.pushKV("address", addr);
-                obj.pushKV("balance", bal);
+                double btcValue = static_cast<double>(bal) / 100000000.0;
+                obj.pushKV("balance", btcValue);
                 result.push_back(obj);
             }
 
