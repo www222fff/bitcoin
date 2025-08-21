@@ -235,7 +235,7 @@ static RPCHelpMan getlatestutxo()
         },
         [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
 {
-            auto balances = g_utxo_db.GetBalances(0, 1000);
+            auto balances = g_utxo_db.GetBalances(0, 100);
 
             UniValue result(UniValue::VARR);
             for (const auto& [addr, bal] : balances) {
@@ -251,14 +251,12 @@ static RPCHelpMan getlatestutxo()
     };
 }
 
-static RPCHelpMan getaddressbalances()
+static RPCHelpMan gettopbalances()
 {
     return RPCHelpMan{
         "getaddressbalances",
         "\nReturns paginated address balances.\n",
-        {
-            {"offset", RPCArg::Type::NUM, RPCArg::Optional::NO, "Starting index (default 0)"},
-        },
+        {},
         RPCResult{
             RPCResult::Type::ARR, "", "List of address balances",
             {
@@ -271,8 +269,8 @@ static RPCHelpMan getaddressbalances()
             }
         },
         RPCExamples{
-            HelpExampleCli("getaddressbalances", "0")
-            + HelpExampleRpc("getaddressbalances", "0")
+            HelpExampleCli("getaddressbalances", "")
+            + HelpExampleRpc("getaddressbalances", "")
         },
         [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
         {
@@ -280,14 +278,14 @@ static RPCHelpMan getaddressbalances()
 
 	    int limit = 100;
 	    int offset = 0;
-	    if (request.params.size() > 0) {
+	    /*if (request.params.size() > 0) {
 		    std::string s = request.params[0].get_str(); // 无论传进来是 "0" 还是 0，都能取到字符串
 		    try {
 			    offset = std::stoi(s);
 		    } catch (const std::exception&) {
 			    throw JSONRPCError(RPC_INVALID_PARAMETER, "Offset must be an integer string");
 		    }
-            }
+            }*/
 
             LogPrintf("Number of params: %d %d\n", offset, limit);
             auto balances = g_addr_db.GetBalances(offset, limit);
