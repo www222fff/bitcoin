@@ -254,7 +254,7 @@ static RPCHelpMan getlatestutxo()
 static RPCHelpMan gettopbalances()
 {
     return RPCHelpMan{
-        "getaddressbalances",
+        "gettopbalances",
         "\nReturns paginated address balances.\n",
         {},
         RPCResult{
@@ -269,8 +269,8 @@ static RPCHelpMan gettopbalances()
             }
         },
         RPCExamples{
-            HelpExampleCli("getaddressbalances", "")
-            + HelpExampleRpc("getaddressbalances", "")
+            HelpExampleCli("gettopbalances", "")
+            + HelpExampleRpc("gettopbalances", "")
         },
         [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
         {
@@ -2591,7 +2591,7 @@ static const CRPCCommand commands[] =
     { "blockchain",         "getlatestutxo",          &getlatestutxo,          {} },
     { "blockchain",         "getblock",               &getblock,               {"blockhash","verbosity|verbose"} },
     { "blockchain",         "getblockhash",           &getblockhash,           {"height"} },
-    { "blockchain",         "getaddressbalances",     &getaddressbalances,     {"offset"} },
+    { "blockchain",         "gettopbalances",         &gettopbalances,         {"offset"} },
     { "blockchain",         "getblockheader",         &getblockheader,         {"blockhash","verbose"} },
     { "blockchain",         "getchaintips",           &getchaintips,           {} },
     { "blockchain",         "getdifficulty",          &getdifficulty,          {} },
