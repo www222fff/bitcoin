@@ -8,11 +8,13 @@
 #include <map>
 #include <vector>
 #include <string>
+#include <mutex>
 
 class AddressBalanceDB {
 private:
     Db db;
     Db sec_db;
+    std::mutex db_mutex;
 
 public:
     explicit AddressBalanceDB(const std::string& filename);

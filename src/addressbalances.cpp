@@ -45,6 +45,7 @@ AddressBalanceDB::~AddressBalanceDB() {
 }
 
 bool AddressBalanceDB::Clear() {
+    std::lock_guard<std::mutex> lock(db_mutex);
     try {
         db.truncate(NULL, NULL, 0); // 清空主数据库，无需计数
         sec_db.truncate(NULL, NULL, 0); // 清空辅助数据库，无需计数
@@ -58,6 +59,7 @@ bool AddressBalanceDB::Clear() {
 
 bool AddressBalanceDB::WriteBalance(const std::string& addr, uint64_t balance, bool is_add)
 {
+    std::lock_guard<std::mutex> lock(db_mutex);
     uint64_t oldBalance = 0;
     uint64_t newBalance = 0;
     int ret = 0;
@@ -138,6 +140,7 @@ bool AddressBalanceDB::WriteBalance(const std::string& addr, uint64_t balance, b
 
 std::string AddressBalanceDB::GetTotalBalances()
 {
+    std::lock_guard<std::mutex> lock(db_mutex);
     int result = 0;
     DB_BTREE_STAT* stats = nullptr;
     if (db.stat(nullptr, &stats, 0) == 0) {
@@ -157,6 +160,7 @@ std::string AddressBalanceDB::GetTotalBalances()
 
 std::map<std::string, uint64_t> AddressBalanceDB::GetBalances(size_t offset, size_t limit)
 {
+    std::lock_guard<std::mutex> lock(db_mutex);
     std::map<std::string, uint64_t> result;
 
     Dbc* cursor;
