@@ -2591,7 +2591,7 @@ static const CRPCCommand commands[] =
     { "blockchain",         "getlatestutxo",          &getlatestutxo,          {} },
     { "blockchain",         "getblock",               &getblock,               {"blockhash","verbosity|verbose"} },
     { "blockchain",         "getblockhash",           &getblockhash,           {"height"} },
-    { "blockchain",         "gettopbalances",         &gettopbalances,         {"offset"} },
+    { "blockchain",         "gettopbalances",         &gettopbalances,         {} },
     { "blockchain",         "getblockheader",         &getblockheader,         {"blockhash","verbose"} },
     { "blockchain",         "getchaintips",           &getchaintips,           {} },
     { "blockchain",         "getdifficulty",          &getdifficulty,          {} },
