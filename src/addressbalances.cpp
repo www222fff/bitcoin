@@ -45,21 +45,22 @@ AddressBalanceDB::~AddressBalanceDB() {
 }
 
 bool AddressBalanceDB::Clear() {
-    std::lock_guard<std::mutex> lock(db_mutex);
     try {
+        std::lock_guard<std::mutex> lock(db_mutex);
         db.truncate(NULL, NULL, 0); // 清空主数据库，无需计数
         sec_db.truncate(NULL, NULL, 0); // 清空辅助数据库，无需计数
-        std::cout << "Database cleared successfully." << std::endl;
         return true;
     } catch (DbException& e) {
         std::cerr << "Clear error: " << e.what() << std::endl;
+        return false;
+    } catch (const std::system_error& e) {
+        std::cerr << "Lock acquisition failed: " << e.what() << " (code: " << e.code() << ")" << std::endl;
         return false;
     }
 }
 
 bool AddressBalanceDB::WriteBalance(const std::string& addr, uint64_t balance, bool is_add)
 {
-    std::lock_guard<std::mutex> lock(db_mutex);
     uint64_t oldBalance = 0;
     uint64_t newBalance = 0;
     int ret = 0;
@@ -123,16 +124,19 @@ bool AddressBalanceDB::WriteBalance(const std::string& addr, uint64_t balance, b
                 std::cout << "del sec db failed " << oldSecKey << " ret " << ret << std::endl;
         }
 
-        ss.str("");
-        ss << std::hex << std::setfill('0') << std::setw(16) << UINT64_MAX - newBalance;
-        std::string newSecKey = ss.str() + "_" +  addr;
+        if (newBalance != 0)
+        {
+            ss.str("");
+            ss << std::hex << std::setfill('0') << std::setw(16) << UINT64_MAX - newBalance;
+            std::string newSecKey = ss.str() + "_" +  addr;
 	
-        char dummy = 0; 
-	Dbt newSKey((void*)newSecKey.data(), newSecKey.size());
-	Dbt newSVal((void*)&dummy, 1);
-	ret = sec_db.put(nullptr, &newSKey, &newSVal, 0);
-        if (ret != 0)
-            std::cout << "add sec db failed " << newSecKey << " ret " << ret << std::endl;
+            char dummy = 0; 
+	    Dbt newSKey((void*)newSecKey.data(), newSecKey.size());
+	    Dbt newSVal((void*)&dummy, 1);
+	    ret = sec_db.put(nullptr, &newSKey, &newSVal, 0);
+            if (ret != 0)
+                std::cout << "add sec db failed " << newSecKey << " ret " << ret << std::endl;
+        }
     }
 
     return true;
@@ -140,7 +144,6 @@ bool AddressBalanceDB::WriteBalance(const std::string& addr, uint64_t balance, b
 
 std::string AddressBalanceDB::GetTotalBalances()
 {
-    std::lock_guard<std::mutex> lock(db_mutex);
     int result = 0;
     DB_BTREE_STAT* stats = nullptr;
     if (db.stat(nullptr, &stats, 0) == 0) {
@@ -160,40 +163,45 @@ std::string AddressBalanceDB::GetTotalBalances()
 
 std::map<std::string, uint64_t> AddressBalanceDB::GetBalances(size_t offset, size_t limit)
 {
-    std::lock_guard<std::mutex> lock(db_mutex);
     std::map<std::string, uint64_t> result;
-
     Dbc* cursor;
-    int ret = sec_db.cursor(nullptr, &cursor, 0);
-    if (ret != 0) {
-        throw std::runtime_error("Failed to open cursor on AddressBalanceDB");
-    }
 
-    Dbt key, value;
-    key.set_flags(DB_DBT_MALLOC);
-    value.set_flags(DB_DBT_MALLOC);
+    try
+    {
+	std::lock_guard<std::mutex> lock(db_mutex);
+	int ret = sec_db.cursor(nullptr, &cursor, 0);
+	if (ret != 0) {
+	    throw std::runtime_error("Failed to open cursor on AddressBalanceDB");
+	}
 
-    size_t idx = 0;
-    while (cursor->get(&key, &value, DB_NEXT) == 0) {
-        if (idx >= offset && result.size() < limit) {
+	Dbt key, value;
+	key.set_flags(DB_DBT_MALLOC);
+        value.set_flags(DB_DBT_MALLOC);
 
-            std::string key_str(static_cast<char*>(key.get_data()), key.get_size());
+        size_t idx = 0;
+        while (cursor->get(&key, &value, DB_NEXT) == 0) {
+            if (idx >= offset && result.size() < limit) {
+                std::string key_str(static_cast<char*>(key.get_data()), key.get_size());
+                std::string balance_str = key_str.substr(0, 16);
+                uint64_t balance = std::stoull(balance_str, nullptr, 16); 
+                //Important Note: Must use sorted key_str as UniValue will resort, if keep addr then output will not be sorted by balance 
+                result[key_str] = UINT64_MAX - balance;
+            }
 
-            std::string balance_str = key_str.substr(0, 16);
-            uint64_t balance = std::stoull(balance_str, nullptr, 16); 
-
-            //Important Note: Must use sorted key_str as UniValue will resort, if keep addr then output will not be sorted by balance 
-            result[key_str] = UINT64_MAX - balance;
+            if (key.get_data()) free(key.get_data());
+            if (value.get_data()) free(value.get_data());
+            ++idx;
+            if (result.size() >= limit) break; 
         }
 
-        if (key.get_data()) free(key.get_data());
-        if (value.get_data()) free(value.get_data());
-
-        ++idx;
-        if (result.size() >= limit) break; 
+        cursor->close();
+        return result;
+    } catch (DbException& e) {
+        std::cerr << "Clear error: " << e.what() << std::endl;
+        return result;
+    } catch (const std::system_error& e) {
+        std::cerr << "Lock acquisition failed: " << e.what() << " (code: " << e.code() << ")" << std::endl;
+        return result;
     }
-
-    cursor->close();
-    return result;
 }
 
