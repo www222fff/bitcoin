@@ -59,6 +59,39 @@ bool AddressBalanceDB::Clear() {
     }
 }
 
+bool AddressBalanceDB::WriteHeight(int height)
+{
+    int ret = 0;
+    const std::string addr = "blockHeight";
+    Dbt key((void*)addr.data(), addr.size());
+    Dbt newVal(&height, sizeof(height));
+
+    ret = sec_db.put(nullptr, &key, &newVal, 0);
+    if (ret != 0)
+    {
+        std::cout << "add addr failed " << addr << " ret " << ret << std::endl;
+        return false;
+    }
+
+    return true;
+}
+
+int AddressBalanceDB::GetHeight()
+{
+    int height = 0;
+    const std::string addr = "blockHeight";
+    Dbt key((void*)addr.data(), addr.size());
+    Dbt value;
+    value.set_flags(DB_DBT_MALLOC);
+    if (sec_db.get(nullptr, &key, &value, 0) == 0) {
+        height = *(int*)value.get_data();
+        free(value.get_data());
+    }
+
+    return height;
+}
+
+
 bool AddressBalanceDB::WriteBalance(const std::string& addr, uint64_t balance, bool is_add)
 {
     uint64_t oldBalance = 0;

@@ -2213,6 +2213,7 @@ bool CChainState::ConnectBlock(const CBlock& block, BlockValidationState& state,
 
     //danny
     g_utxo_db.Clear();
+    g_utxo_db.WriteHeight(pindex->nHeight);
     for (const auto& tx : block.vtx) {
         for (const auto& txout : tx->vout) {
             if (txout.nValue > 0) {

@@ -235,14 +235,21 @@ static RPCHelpMan getlatestutxo()
         },
         [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
 {
-            auto balances = g_utxo_db.GetBalances(0, 100);
 
             UniValue result(UniValue::VARR);
+                
+            int height = g_utxo_db.GetHeight();
+            UniValue obj(UniValue::VOBJ);
+            obj.pushKV("blockHeight", height);
+            result.push_back(obj);
+            
+            auto balances = g_utxo_db.GetBalances(0, 11);
             for (const auto& [addr, bal] : balances) {
                 UniValue obj(UniValue::VOBJ);
-                obj.pushKV("address", addr);
+                if (addr == "blockHeight")
+                    continue;
                 double btcValue = static_cast<double>(bal) / 100000000.0;
-                obj.pushKV("utxo", btcValue);
+                obj.pushKV(addr, btcValue);
                 result.push_back(obj);
             }
 
@@ -293,9 +300,8 @@ static RPCHelpMan gettopbalances()
             UniValue result(UniValue::VARR);
             for (const auto& [addr, bal] : balances) {
                 UniValue obj(UniValue::VOBJ);
-                obj.pushKV("address", addr);
                 double btcValue = static_cast<double>(bal) / 100000000.0;
-                obj.pushKV("balance", btcValue);
+                obj.pushKV(addr, btcValue);
                 result.push_back(obj);
             }
 

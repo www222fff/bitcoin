@@ -22,6 +22,8 @@ public:
 
     // 写入或更新地址余额
     bool WriteBalance(const std::string& addr, uint64_t balance, bool is_add);
+    bool WriteHeight(int height);
+    int GetHeight();
 
     // 遍历所有地址和余额
     std::string GetTotalBalances();
